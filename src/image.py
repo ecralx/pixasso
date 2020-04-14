@@ -2,13 +2,10 @@ import numpy as np
 from skimage.segmentation import slic
 from skimage.util import img_as_float
 from skimage import io
-from palette import Palette
+from src.palette import Palette
 
 class Image:
-  __Tf = 1
-  __alpha = 0.7
-
-  def __init__(self, path, n_colors=8, iters=100, Tc=):
+  def __init__(self, path, n_colors=8, iters=100):
     self.__path = path
     self.__n_colors = n_colors
     self.content = img_as_float(io.imread(path))
@@ -52,9 +49,7 @@ class Image:
     """Returns a pixelized image
     """
     # Init
-    Tc = 2 * 1 # 2 x Variance along the major principal axis of the set in LAB space
-    T = 1.1 * Tc
-
+    T = 1
     image = np.zeros_like(self.content)
     superpixels = self.get_superpixels()
     palette = self.generate_color_clusters()

@@ -5,7 +5,6 @@ import networkx as nx
 import hdbscan
 from functools import wraps
 
-
 def fitted(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
@@ -101,6 +100,7 @@ class Palette:
         self._init_leaves_attributes(img_colors, leaves)
         self._flow_back_attributes(leaves)
         self._fitted = True
+        self._populate_values(img_colors)
 
     def _setup_dataframes(self):
         """Creates dataframes based on clustering tree
@@ -177,3 +177,64 @@ class Palette:
                 # Increment attributes with leaf values
                 self.g.nodes[ancester][self.N_PIXELS] += self.g.nodes[leaf][self.N_PIXELS]
                 self.g.nodes[ancester][self.COLOR_SUM] += self.g.nodes[leaf][self.COLOR_SUM]
+
+    def _populate_values(self, img_colors):
+        """Populates the palette values by traversing the graph. 
+        TODO: expliquer comment ça marche
+        """
+        values = []
+        nodes_idx = []
+        root = [n for n,d in self.g.in_degree() if d == 0].pop(0)
+        successors = self.g.successors(root)
+        while len(nodes_idx) < self._n_colors:
+            # First element
+            element1 = next(successors, False) # avoid StopIteration
+            if not element1: break
+            element1_successors = self.g.successors(element1)
+            
+            child_11 = next(element1_successors, False)
+            child_12 = next(element1_successors, False)
+
+            if not child_11 or not child_12:
+                distance1 = 0
+            else:
+                sum_color_11 = self.g.nodes[child_11][self.COLOR_SUM]
+                sum_color_12 = self.g.nodes[child_12][self.COLOR_SUM]
+                distance1 = np.linalg.norm(sum_color_11 - sum_color_12)
+            
+            # Second element
+            element2 = next(successors, False)
+            if not element2: break
+            element2_successors = self.g.successors(element2)
+            
+            child_21 = next(element2_successors, False)
+            child_22 = next(element2_successors, False)
+            if not child_21 or not child_22:
+                distance2 = 0
+            else:
+                sum_color_21 = self.g.nodes[child_21][self.COLOR_SUM]
+                sum_color_22 = self.g.nodes[child_22][self.COLOR_SUM]
+                distance2 = np.linalg.norm(sum_color_21 - sum_color_22)
+
+            if distance1 > 0 or distance2 > 0:
+                if distance1 < distance2: # we take second element children
+                    # remove parent if exists
+                    if element2 in nodes_idx:
+                        nodes_idx.remove(element2)
+                    nodes_idx.append(child_21)
+                    nodes_idx.append(child_22)
+                    successors = self.g.successors(element2)
+                else: # we take first element children
+                    if element1 in nodes_idx:
+                        nodes_idx.remove(element1)
+                    nodes_idx.append(child_11)
+                    nodes_idx.append(child_12)
+                    successors = self.g.successors(element1)
+        
+        for id in nodes_idx:
+            node = self.g.nodes[id]
+            values.append(node[self.COLOR_SUM] / node[self.N_PIXELS])
+        
+        self.values = np.array(values)
+        self.nodes_idx = nodes_idx
+        
